@@ -70,6 +70,17 @@ def find_team_names(box_score_soup):
     return team_names
 
 
+def clean_df(df):
+
+    df = df[~df['name'].isin(['Starters', 'Reserves'])]
+
+    if 'reason' in df.columns:
+
+        df = df[df['reason'] != 'Did Not Play']
+
+    return df
+
+
 def assemble_stats_table(box_score_soup, date):
 
     parsing_results = [try_to_parse(x) for x in box_score_soup.find_all('tr')]
@@ -78,15 +89,27 @@ def assemble_stats_table(box_score_soup, date):
     valid_only = [x for x in parsing_results if len(x) > 0 and
                   len(x['name']) > 0 and x['name'] != 'Player']
 
+    # Drop advanced box score
+    valid_only = [x for x in valid_only if 'orb_pct' not in x]
+
     # Split by team totals
     all_names = [x['name'] for x in valid_only]
     totals_indices = [i for i, x in enumerate(all_names) if x == 'Team Totals']
-    total_1, total_2 = totals_indices
+
+    total_1 = totals_indices[0]
+    total_2_start = totals_indices[(len(totals_indices) // 2 - 1)]
+    total_2_end = totals_indices[(len(totals_indices) // 2)]
 
     team_1_results = pd.DataFrame(valid_only[:total_1+1])
-    team_2_results = pd.DataFrame(valid_only[total_1+1:])
+    team_2_results = pd.DataFrame(valid_only[total_2_start+1:total_2_end+1])
 
-    team_1_name, team_2_name = find_team_names(box_score_soup)
+    team_1_results = clean_df(team_1_results)
+    team_2_results = clean_df(team_2_results)
+
+    all_names = find_team_names(box_score_soup)
+
+    team_1_name = all_names[0]
+    team_2_name = all_names[len(all_names) // 2]
 
     team_1_results['team'] = team_1_name
     team_2_results['team'] = team_2_name
